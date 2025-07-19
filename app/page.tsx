@@ -93,7 +93,7 @@ export default function ProductivityDashboard() {
     email: "user@example.com",
     plan: "Free" as "Free" | "Premium",
     avatar: "/placeholder.svg?height=40&width=40",
-    messageCount: { 1: 5, 2: 3, 3: 8 }, // Daily message count per character
+    messageCount: { 1: 5, 2: 3, 3: 8 } as Record<number, number>, // Daily message count per character
   })
 
   // Available characters (10 total) - Starting with bond level 0
@@ -131,7 +131,7 @@ export default function ProductivityDashboard() {
     {
       id: 3,
       name: "Nagisa",
-      avatar: "/placeholder.svg?height=80&width=80&text=Nagisa",
+      avatar: "/nagisa-avatar.png",
       level: 1,
       personality: "Tsundere Rival",
       description: "A competitive study rival who pushes you to excel",
@@ -416,6 +416,14 @@ export default function ProductivityDashboard() {
     const xpGained = todo.xp * xpMultiplier
     setTotalXP((prev) => prev + xpGained)
 
+    // Check if this is the first task completed today for streak
+    const today = new Date().toDateString()
+    const todayCompletedTasks = todos.filter((t) => t.completed).length
+    if (todayCompletedTasks === 0 && lastLogin !== today) {
+      setStreakCount((prev) => prev + 1)
+      setLastLogin(today)
+    }
+
     // Generate AI messages for all companions
     const aiMessages = await Promise.all(
       userCompanions.map(async (companion) => {
@@ -668,8 +676,7 @@ export default function ProductivityDashboard() {
       {/* System Messages */}
       {systemMessages.length > 0 && (
         <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
-          {systemMessages.slice(-3).map((message, index) => {
-            const actualIndex = systemMessages.length - 3 + index
+          {systemMessages.map((message, index) => {
             const parts = message.split(": ")
             const characterName = parts[0]
             const messageText = parts.slice(1).join(": ")
@@ -677,7 +684,7 @@ export default function ProductivityDashboard() {
 
             return (
               <div
-                key={actualIndex}
+                key={index}
                 className="bg-purple-600 text-white p-3 rounded-lg shadow-lg animate-slide-in flex items-start gap-3"
               >
                 {character && (
@@ -693,7 +700,7 @@ export default function ProductivityDashboard() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setSystemMessages((prev) => prev.filter((_, i) => i !== actualIndex))}
+                  onClick={() => setSystemMessages((prev) => prev.filter((_, i) => i !== index))}
                   className="h-6 w-6 p-0 text-white hover:bg-purple-700 flex-shrink-0"
                 >
                   ×
@@ -1141,7 +1148,7 @@ export default function ProductivityDashboard() {
             userPlan={userInfo.plan}
           />
         ) : currentView === "premium" ? (
-          <div className="p-6 overflow-y-auto bg-gray-900 min-h-screen">
+          <div className="p-6 overflow-y-auto bg-black min-h-screen">
             <div className="flex items-center gap-4 mb-8">
               <div>
                 <h1 className="text-2xl font-bold text-white">Premium Features</h1>

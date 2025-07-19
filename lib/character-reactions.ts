@@ -101,7 +101,7 @@ export function getBondLevelMessage(character: Character, newBondLevel: number):
   const { name } = character
 
   if (name === "Annie") {
-    const messages = {
+    const messages: Record<number, string> = {
       3: "Bond Level 3! We're becoming such good friends! I love spending time with you! 💕",
       5: "Bond Level 5! You mean so much to me! Let's keep growing together! 🌟💖",
       7: "Bond Level 7! Our friendship is so special! I'm always here for you! ✨💕",
@@ -111,7 +111,7 @@ export function getBondLevelMessage(character: Character, newBondLevel: number):
   }
 
   if (name === "Ken") {
-    const messages = {
+    const messages: Record<number, string> = {
       3: "Bond Level 3 achieved. Our mentoring relationship is developing well. I'm pleased with your progress.",
       5: "Bond Level 5. You've shown dedication to growth. I respect your commitment to improvement.",
       7: "Bond Level 7. Our partnership has become quite effective. You've earned my trust.",
@@ -121,7 +121,7 @@ export function getBondLevelMessage(character: Character, newBondLevel: number):
   }
 
   if (name === "Nagisa") {
-    const messages = {
+    const messages: Record<number, string> = {
       3: "Bond Level 3 reached. Don't get the wrong idea... I just enjoy spending time with you! 😤💕",
       5: "Bond Level 5?! It's not like I care about you or anything... but you're not terrible company... 😏💫",
       7: "Bond Level 7... Fine! Maybe I do care about you a little bit! But don't tell anyone! 😤❤️",
@@ -166,7 +166,7 @@ export function getStreakMessage(character: Character, streakDays: number): stri
   const { name } = character
 
   if (name === "Annie") {
-    const messages = {
+    const messages: Record<number, string> = {
       3: `3 days in a row! You're on fire! I'm so excited to see your progress! 🔥💕`,
       7: `A whole week! You're absolutely amazing! I'm so proud of you! 🌟✨`,
       14: `Two weeks straight! You're incredible! This is so inspiring! 💪💖`,
@@ -176,7 +176,7 @@ export function getStreakMessage(character: Character, streakDays: number): stri
   }
 
   if (name === "Ken") {
-    const messages = {
+    const messages: Record<number, string> = {
       3: `3-day streak established. Consistency is the foundation of excellence. Well done.`,
       7: `7-day streak achieved. Your discipline is becoming habitual. Excellent progress.`,
       14: `14-day streak. You've demonstrated remarkable consistency. This is mastery in action.`,
@@ -186,7 +186,7 @@ export function getStreakMessage(character: Character, streakDays: number): stri
   }
 
   if (name === "Nagisa") {
-    const messages = {
+    const messages: Record<number, string> = {
       3: `3 days?! Okay, maybe you're not as hopeless as I thought... Keep it up! 😤⚡`,
       7: `A whole week?! Fine, I'm... I'm actually impressed! Don't let it go to your head! 😏🔥`,
       14: `Two weeks straight?! You're actually pretty amazing... Not that I care or anything! 😤💫`,

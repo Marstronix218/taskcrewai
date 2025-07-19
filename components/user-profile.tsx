@@ -59,7 +59,7 @@ export default function UserProfile({
   }
 
   return (
-    <div className="p-6 min-h-screen bg-gray-900">
+    <div className="p-6 min-h-screen bg-black">
       <div className="flex items-center gap-4 mb-8">
         <Button variant="ghost" size="sm" onClick={onBack} className="p-2 text-white">
           <ArrowLeft className="w-4 h-4" />

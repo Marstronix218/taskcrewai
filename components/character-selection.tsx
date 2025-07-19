@@ -22,8 +22,8 @@ interface Character {
   maxBond: number
   prompt: string
   lastMessage?: string
-  xp?: number
-  tasksCompleted?: number
+  xp: number
+  tasksCompleted: number
 }
 
 interface CharacterSelectionProps {
@@ -123,7 +123,7 @@ export default function CharacterSelection({
   }
 
   return (
-    <div className="p-6 bg-gray-900 min-h-screen">
+    <div className="p-6 bg-black min-h-screen">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={onBack} className="p-2 text-white">
