@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
+import { callOpenAI, createCharacterPrompt } from "@/lib/openai"
 import { ArrowLeft, Send, MoreVertical, Heart, Zap, Menu, X } from "lucide-react"
 
 interface Message {
@@ -80,7 +81,7 @@ export default function ChatInterface({
   useEffect(() => {
     if (chatHistory.length === 0) {
       const greeting: Message = {
-        id: Date.now(),
+        id: Date.now() + Math.random() * 1000,
         text: `Hi there! I'm ${character.name}. ${character.description} How can I help you stay productive today? 😊`,
         sender: "character",
         timestamp: new Date(),
@@ -92,48 +93,40 @@ export default function ChatInterface({
 
   useEffect(scrollToBottom, [messages])
 
-  const callOpenAI = async (userText: string): Promise<string> => {
-    // Include a short summary of outstanding tasks for context
-    const pendingTasks = userTasks.filter((t) => !t.completed).slice(0, 5)
-    const taskContext =
-      pendingTasks.length > 0
-        ? `Here are the user's remaining tasks:\n${pendingTasks.map((t) => `• ${t.text} [${t.category}]`).join("\n")}`
-        : "The user currently has no outstanding tasks."
-
-    const payload = {
-      messages: [
-        {
-          role: "system",
-          content: `${character.prompt}\n\nThe user's name is "${userInfo?.username || "User"}". You can use their name in conversation when appropriate.`,
-        },
-        { role: "system", content: taskContext },
-        ...messages
-          .filter((m) => m.type === "text")
-          .slice(-10)
-          .map((m) => ({
-            role: m.sender === "user" ? "user" : "assistant",
-            content: m.text,
-          })),
-        { role: "user", content: userText },
-      ],
-      max_tokens: 150,
-      temperature: 0.8,
-    }
-
+  const generateAIResponse = async (userText: string): Promise<string> => {
     try {
-      const res = await fetch("/api/openai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      // Include a short summary of outstanding tasks for context
+      const pendingTasks = userTasks.filter((t) => !t.completed).slice(0, 5)
+      const taskContext =
+        pendingTasks.length > 0
+          ? `Here are the user's remaining tasks:\n${pendingTasks.map((t) => `• ${t.text} [${t.category}]`).join("\n")}`
+          : "The user currently has no outstanding tasks."
+
+      // Create the base prompt
+      const baseMessages = createCharacterPrompt(
+        character.prompt,
+        userInfo?.username || "User",
+        taskContext
+      )
+
+      // Add conversation history
+      const conversationHistory = messages
+        .filter((m) => m.type === "text")
+        .slice(-10)
+        .map((m) => ({
+          role: (m.sender === "user" ? "user" : "assistant") as "user" | "assistant",
+          content: m.text,
+        }))
+
+      // Add the current user message
+      const allMessages = [...baseMessages, ...conversationHistory, { role: "user" as const, content: userText }]
+
+      return await callOpenAI(allMessages, {
+        maxTokens: 150,
+        temperature: 0.8,
       })
-      if (!res.ok) {
-        console.error("OpenAI route error:", await res.text())
-        return "Sorry, something went wrong. 😅"
-      }
-      const data = await res.json()
-      return data.choices?.[0]?.message?.content || "..."
-    } catch (err) {
-      console.error(err)
+    } catch (error) {
+      console.error("Error calling OpenAI:", error)
       return "Sorry, something went wrong. 😅"
     }
   }
@@ -147,7 +140,7 @@ export default function ChatInterface({
     }
 
     const userMsg: Message = {
-      id: Date.now(),
+      id: Date.now() + Math.random() * 1000,
       text: newMessage,
       sender: "user",
       timestamp: new Date(),
@@ -159,10 +152,10 @@ export default function ChatInterface({
     setNewMessage("")
     setIsTyping(true)
 
-    const aiText = await callOpenAI(newMessage)
+    const aiText = await generateAIResponse(newMessage)
 
     const aiMsg: Message = {
-      id: Date.now() + 1,
+      id: Date.now() + Math.random() * 1000 + 1000,
       text: aiText,
       sender: "character",
       timestamp: new Date(),

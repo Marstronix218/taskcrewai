@@ -89,12 +89,20 @@ export default function ProductivityDashboard() {
 
   // User info (will be connected to Supabase later)
   const [userInfo, setUserInfo] = useState({
-    username: `User${Math.floor(Math.random() * 10000)}`,
+    username: "User",
     email: "user@example.com",
     plan: "Free" as "Free" | "Premium",
     avatar: "/placeholder.svg?height=40&width=40",
     messageCount: { 1: 5, 2: 3, 3: 8 } as Record<number, number>, // Daily message count per character
   })
+
+  // Generate random username on client side only
+  useEffect(() => {
+    setUserInfo(prev => ({
+      ...prev,
+      username: `User${Math.floor(Math.random() * 10000)}`
+    }))
+  }, [])
 
   // Available characters (10 total) - Starting with bond level 0
   const allCharacters: Character[] = [
@@ -410,6 +418,7 @@ export default function ProductivityDashboard() {
     const todo = todos.find((t) => t.id === id)
     if (!todo || todo.completed) return
 
+    // Mark the todo as completed immediately to prevent double execution
     setTodos(todos.map((t) => (t.id === id ? { ...t, completed: true } : t)))
 
     // Award XP with multiplier
@@ -449,11 +458,25 @@ export default function ProductivityDashboard() {
         if (aiMessageData) {
           setTimeout(
             () => {
-              setSystemMessages((prev) => [...prev, `${companion.name}: ${aiMessageData.message}`])
+              const systemMessage = `${companion.name}: ${aiMessageData.message}`
+              
+              // Check if this system message already exists to prevent duplicates
+              setSystemMessages((prev) => {
+                const messageExists = prev.some(msg => 
+                  msg === systemMessage && 
+                  prev.indexOf(msg) >= prev.length - 3 // Check only recent messages
+                )
+                
+                if (messageExists) {
+                  return prev // Don't add duplicate system messages
+                }
 
-              // Add to chat history
+                return [...prev, systemMessage]
+              })
+
+              // Add to chat history with unique IDs to prevent duplicates
               const taskMessage = {
-                id: Date.now() + companion.id,
+                id: Date.now() + companion.id * 10000 + Math.random() * 1000,
                 text: `Completed ${todo.text}`,
                 sender: "user" as const,
                 timestamp: new Date(),
@@ -461,17 +484,31 @@ export default function ProductivityDashboard() {
               }
 
               const responseMessage = {
-                id: Date.now() + companion.id + 1,
+                id: Date.now() + companion.id * 10000 + Math.random() * 1000 + 1000,
                 text: aiMessageData.message,
                 sender: "character" as const,
                 timestamp: new Date(),
                 type: "text" as const,
               }
 
-              setChatHistories((prev) => ({
-                ...prev,
-                [companion.id]: [...(prev[companion.id] || []), taskMessage, responseMessage].slice(-10),
-              }))
+              // Check if this exact message already exists to prevent duplicates
+              setChatHistories((prev) => {
+                const existingHistory = prev[companion.id] || []
+                const taskExists = existingHistory.some(msg => 
+                  msg.text === taskMessage.text && 
+                  msg.sender === "user" && 
+                  Math.abs(msg.timestamp.getTime() - taskMessage.timestamp.getTime()) < 5000
+                )
+                
+                if (taskExists) {
+                  return prev // Don't add duplicate messages
+                }
+
+                return {
+                  ...prev,
+                  [companion.id]: [...existingHistory, taskMessage, responseMessage].slice(-10),
+                }
+              })
             },
             1000 + companion.id * 500,
           ) // Stagger messages
@@ -482,7 +519,20 @@ export default function ProductivityDashboard() {
           setTimeout(
             () => {
               const levelMessage = getLevelUpMessage(companion, newLevel)
-              setSystemMessages((prev) => [...prev, `${companion.name}: ${levelMessage}`])
+              const systemLevelMessage = `${companion.name}: ${levelMessage}`
+              
+              setSystemMessages((prev) => {
+                const messageExists = prev.some(msg => 
+                  msg === systemLevelMessage && 
+                  prev.indexOf(msg) >= prev.length - 3
+                )
+                
+                if (messageExists) {
+                  return prev
+                }
+
+                return [...prev, systemLevelMessage]
+              })
             },
             2000 + companion.id * 500,
           )
@@ -492,7 +542,20 @@ export default function ProductivityDashboard() {
           setTimeout(
             () => {
               const bondMessage = getBondLevelMessage(companion, Math.floor(newBondLevel))
-              setSystemMessages((prev) => [...prev, `${companion.name}: ${bondMessage}`])
+              const systemBondMessage = `${companion.name}: ${bondMessage}`
+              
+              setSystemMessages((prev) => {
+                const messageExists = prev.some(msg => 
+                  msg === systemBondMessage && 
+                  prev.indexOf(msg) >= prev.length - 3
+                )
+                
+                if (messageExists) {
+                  return prev
+                }
+
+                return [...prev, systemBondMessage]
+              })
             },
             3000 + companion.id * 500,
           )
@@ -721,8 +784,8 @@ export default function ProductivityDashboard() {
           className="flex items-center gap-2 mb-8 cursor-pointer hover:opacity-80 transition-opacity"
           onClick={backToDashboard}
         >
-          <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-            <Sparkles className="w-5 h-5" />
+          <div className="w-8 h-8 flex items-center justify-center">
+            <img src="/logo.png" alt="App Logo" className="w-8 h-8 rounded-lg object-cover" />
           </div>
           <span className="text-xl font-bold text-white">TaskCrewAI</span>
           <Button
@@ -971,7 +1034,7 @@ export default function ProductivityDashboard() {
                       <div className="flex gap-2">
                         <Select value={newTodoCategory} onValueChange={setNewTodoCategory}>
                           <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
-                            <SelectValue />
+                            <SelectValue placeholder="Select Category" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="General">General</SelectItem>
@@ -986,7 +1049,7 @@ export default function ProductivityDashboard() {
                           onValueChange={(value: "Easy" | "Medium" | "Hard") => setNewTodoDifficulty(value)}
                         >
                           <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
-                            <SelectValue />
+                            <SelectValue placeholder="Select Difficulty" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Easy">Easy (10 XP)</SelectItem>
