@@ -126,9 +126,6 @@ export default function CharacterSelection({
     <div className="p-6 bg-black min-h-screen overflow-y-auto">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={onBack} className="p-2 text-white">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
           <div>
             <h1 className="text-2xl font-bold text-white">Choose Your Crew</h1>
             <p className="text-gray-400">Select up to {maxCompanions} companions to help you stay productive</p>

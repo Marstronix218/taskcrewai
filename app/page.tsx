@@ -777,7 +777,7 @@ export default function ProductivityDashboard() {
       {/* Sidebar */}
       <div
         className={`fixed left-0 top-0 h-full bg-gray-800 border-r border-gray-700 p-4 transition-all duration-300 z-10 ${
-          sidebarOpen ? "w-64" : "w-0 p-0 border-0"
+          sidebarOpen ? "w-64" : "w-0 p-0 border-0 opacity-0 pointer-events-none"
         } overflow-hidden`}
       >
         <div
@@ -871,7 +871,7 @@ export default function ProductivityDashboard() {
               className="w-full bg-transparent text-white border-gray-600 mb-2"
             >
               <Crown className="w-4 h-4 mr-2" />
-              Upgrade to Pro
+              Upgrade to Premium
             </Button>
           )}
         </div>

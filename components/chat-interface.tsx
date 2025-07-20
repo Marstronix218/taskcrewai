@@ -182,12 +182,6 @@ export default function ChatInterface({
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 text-white">
-            {sidebarOpen ? <Menu className="w-4 h-4" /> : <X className="w-4 h-4" />}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onBack} className="p-2 text-white">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
           <Avatar className="w-14 h-14">
             <AvatarImage src={character.avatar || "/placeholder.svg"} />
             <AvatarFallback className="text-xl">{character.name[0]}</AvatarFallback>
