@@ -82,6 +82,3 @@ TaskCrewAI is a gamified productivity dashboard and AI companion app. Boost your
 ## Credits
 - Built with [Next.js](https://nextjs.org/), [React](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/), and [OpenAI](https://platform.openai.com/).
 - Character art and avatars are placeholders. Replace with your own assets as needed.
-
-## License
-[MIT](LICENSE) 
