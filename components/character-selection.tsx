@@ -123,7 +123,7 @@ export default function CharacterSelection({
   }
 
   return (
-    <div className="p-6 bg-black min-h-screen">
+    <div className="p-6 bg-black min-h-screen overflow-y-auto">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={onBack} className="p-2 text-white">
@@ -246,9 +246,9 @@ export default function CharacterSelection({
             >
               <CardHeader className="text-center pb-2">
                 <div className="relative">
-                  <Avatar className="w-20 h-20 mx-auto mb-3">
+                  <Avatar className="w-28 h-28 mx-auto mb-3">
                     <AvatarImage src={character.avatar || "/placeholder.svg"} />
-                    <AvatarFallback className="text-2xl">{character.name[0]}</AvatarFallback>
+                    <AvatarFallback className="text-3xl">{character.name[0]}</AvatarFallback>
                   </Avatar>
                   {isSelected && (
                     <div className="absolute -top-2 -right-2 w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center">

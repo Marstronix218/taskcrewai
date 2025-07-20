@@ -188,9 +188,9 @@ export default function ChatInterface({
           <Button variant="ghost" size="sm" onClick={onBack} className="p-2 text-white">
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <Avatar className="w-10 h-10">
+          <Avatar className="w-14 h-14">
             <AvatarImage src={character.avatar || "/placeholder.svg"} />
-            <AvatarFallback className="text-lg">{character.name[0]}</AvatarFallback>
+            <AvatarFallback className="text-xl">{character.name[0]}</AvatarFallback>
           </Avatar>
           <div>
             <h2 className="font-semibold text-white">{character.name}</h2>
@@ -218,7 +218,7 @@ export default function ChatInterface({
           <div key={m.id} className={`flex ${m.sender === "user" ? "justify-end" : "justify-start"}`}>
             <div className={`flex gap-2 max-w-[80%] ${m.sender === "user" ? "flex-row-reverse" : ""}`}>
               {m.sender === "character" && (
-                <Avatar className="w-8 h-8 mt-1">
+                <Avatar className="w-10 h-10 mt-1">
                   <AvatarImage src={character.avatar || "/placeholder.svg"} />
                   <AvatarFallback className="text-sm">{character.name[0]}</AvatarFallback>
                 </Avatar>
@@ -251,7 +251,7 @@ export default function ChatInterface({
         {isTyping && (
           <div className="flex justify-start">
             <div className="flex gap-2">
-              <Avatar className="w-8 h-8 mt-1">
+              <Avatar className="w-10 h-10 mt-1">
                 <AvatarImage src={character.avatar || "/placeholder.svg"} />
                 <AvatarFallback className="text-sm">{character.name[0]}</AvatarFallback>
               </Avatar>
