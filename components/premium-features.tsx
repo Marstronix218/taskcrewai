@@ -102,7 +102,7 @@ export default function PremiumFeatures({ userPlan, onUpgrade }: PremiumFeatures
               </p>
               <Button onClick={onUpgrade} className="w-full bg-purple-600 hover:bg-purple-700">
                 <Crown className="w-4 h-4 mr-2" />
-                Upgrade for $10/month
+                Upgrade for $15/month
               </Button>
             </div>
           )}

@@ -136,7 +136,7 @@ export default function UserProfile({
               <div>
                 <p className="text-white font-medium">Current Plan</p>
                 <p className="text-gray-400 text-sm">
-                  {userInfo.plan === "Premium" ? "Premium - $10/month" : "Free Plan"}
+                  {userInfo.plan === "Premium" ? "Premium - $15/month" : "Free Plan"}
                 </p>
               </div>
               <Badge variant={userInfo.plan === "Premium" ? "default" : "outline"}>{userInfo.plan}</Badge>
