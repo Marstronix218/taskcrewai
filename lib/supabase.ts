@@ -5,6 +5,49 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+export async function getCurrentUser() {
+  const { data } = await supabase.auth.getUser()
+  return data.user
+}
+
+export async function getUserProfile(user_id) {
+  const { data, error } = await supabase.from("user_profiles").select("*").eq("user_id", user_id).single()
+  if (error) return null
+  return data
+}
+
+export async function createUserProfile(profile) {
+  const { error } = await supabase.from("user_profiles").insert([profile])
+  return !error
+}
+
+export async function updateUserProfile(user_id, updates) {
+  const { error } = await supabase.from("user_profiles").update(updates).eq("user_id", user_id)
+  return !error
+}
+
+export async function getTasks(user_id) {
+  const { data, error } = await supabase.from("tasks").select("*").eq("user_id", user_id).order("created_at", { ascending: false })
+  if (error) return []
+  return data
+}
+
+export async function addTask(task) {
+  const { data, error } = await supabase.from("tasks").insert([task]).select().single()
+  if (error) return null
+  return data
+}
+
+export async function updateTask(task_id, updates) {
+  const { error } = await supabase.from("tasks").update(updates).eq("task_id", task_id)
+  return !error
+}
+
+export async function deleteTask(task_id) {
+  const { error } = await supabase.from("tasks").delete().eq("task_id", task_id)
+  return !error
+}
+
 export interface UserProfile {
   user_id: string
   username: string
@@ -51,37 +94,4 @@ export interface Message {
   sender: "user" | "character"
   timestamp: Date
   type?: "text" | "reward" | "system"
-}
-
-export async function getUserProfile(userId: string): Promise<UserProfile | null> {
-  const { data, error } = await supabase.from("user_profiles").select("*").eq("user_id", userId).single()
-
-  if (error) {
-    console.error("Error fetching user profile:", error)
-    return null
-  }
-
-  return data
-}
-
-export async function updateUserProfile(userId: string, updates: Partial<UserProfile>) {
-  const { error } = await supabase.from("user_profiles").update(updates).eq("user_id", userId)
-
-  if (error) {
-    console.error("Error updating user profile:", error)
-    return false
-  }
-
-  return true
-}
-
-export async function createUserProfile(profile: UserProfile) {
-  const { error } = await supabase.from("user_profiles").insert([profile])
-
-  if (error) {
-    console.error("Error creating user profile:", error)
-    return false
-  }
-
-  return true
 }

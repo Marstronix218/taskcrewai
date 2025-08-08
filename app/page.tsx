@@ -47,6 +47,7 @@ import {
   getBondLevelMessage,
   getMissedTasksMessage,
 } from "@/lib/character_reactions"
+import { getCurrentUser, getUserProfile, createUserProfile, getTasks, addTask, updateTask, deleteTask } from "@/lib/supabase"
 
 interface Todo {
   id: number
@@ -62,13 +63,7 @@ interface ChatHistory {
 }
 
 export default function ProductivityDashboard() {
-  const [todos, setTodos] = useState<Todo[]>([
-    { id: 1, text: "Complete morning workout", completed: false, xp: 25, category: "Health", difficulty: "Medium" },
-    { id: 2, text: "Review project proposal", completed: true, xp: 15, category: "Work", difficulty: "Easy" },
-    { id: 3, text: "Call mom", completed: false, xp: 10, category: "Personal", difficulty: "Easy" },
-    { id: 4, text: "Read 30 minutes", completed: true, xp: 20, category: "Study", difficulty: "Medium" },
-  ])
-
+  const [todos, setTodos] = useState<Todo[]>([])
   const [newTodo, setNewTodo] = useState("")
   const [newTodoCategory, setNewTodoCategory] = useState("General")
   const [newTodoDifficulty, setNewTodoDifficulty] = useState<"Easy" | "Medium" | "Hard">("Easy")
@@ -86,23 +81,12 @@ export default function ProductivityDashboard() {
   const [systemMessages, setSystemMessages] = useState<string[]>([])
   const [lastLogin, setLastLogin] = useState(new Date().toDateString())
   const [lastCheckinTime, setLastCheckinTime] = useState<number>(0)
+  const [userInfo, setUserInfo] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
-  // User info (will be connected to Supabase later)
-  const [userInfo, setUserInfo] = useState({
-    username: "User",
-    email: "user@example.com",
-    plan: "Free" as "Free" | "Premium",
-    avatar: "/placeholder.svg?height=40&width=40",
-    messageCount: { 1: 5, 2: 3, 3: 8 } as Record<number, number>, // Daily message count per character
-  })
-
-  // Generate random username on client side only
-  useEffect(() => {
-    setUserInfo(prev => ({
-      ...prev,
-      username: `User${Math.floor(Math.random() * 10000)}`
-    }))
-  }, [])
+  if (loading || !userInfo) {
+    return <div className="text-center py-8">Loading...</div>;
+  }
 
   // Available characters (10 total) - Starting with bond level 0
   const allCharacters: Character[] = [
@@ -263,6 +247,60 @@ export default function ProductivityDashboard() {
     allCharacters[1], // Ken
     allCharacters[2], // Nagisa
   ])
+
+  // ⬅️ REPLACE *just* this useEffect
+  useEffect(() => {
+    async function initialise() {
+      setLoading(true);
+
+      // 1️⃣ Ask Supabase for the session that is already in localStorage (if any)
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {                    // ← the user is not logged-in
+        setLoading(false);               // you might want router.push("/auth") here
+        return;
+      }
+
+      const user = session.user;         // guaranteed not to be null
+
+      // 2️⃣ Profile handling (your original logic)
+      let profile = await getUserProfile(user.id);
+      if (!profile) {
+        profile = {
+          user_id: user.id,
+          username: user.email?.split("@")[0] || "User",
+          email: user.email,
+          plan: "Free",
+          total_xp: 0,
+          streak_count: 0,
+        };
+        await createUserProfile(profile);
+        profile = await getUserProfile(user.id);
+      }
+      setUserInfo(profile);
+
+      // 3️⃣ Load the user’s tasks
+      const tasks = await getTasks(user.id);
+      setTodos(tasks);
+
+      setLoading(false);
+    }
+
+    initialise();        // run once on mount
+
+    // 4️⃣ Also react to future sign-in / sign-out events
+    const { data: { subscription } } =
+      supabase.auth.onAuthStateChange((_event, session) => {
+        if (session) initialise();       // signed in  → refresh data
+        else {                           // signed out → clear data
+          setUserInfo(null);
+          setTodos([]);
+        }
+      });
+
+    // 5️⃣ Clean up the listener when the component unmounts
+    return () => subscription.unsubscribe();
+  }, []);               //  ← only this dependency array
 
   // Check for missed tasks at end of day
   useEffect(() => {
@@ -573,30 +611,30 @@ export default function ProductivityDashboard() {
     )
   }
 
-  const addTodo = () => {
-    if (newTodo.trim()) {
+  const addTodo = async () => {
+    if (newTodo.trim() && userInfo) {
       const xpByDifficulty = { Easy: 10, Medium: 20, Hard: 30 }
-      setTodos([
-        ...todos,
-        {
-          id: Date.now(),
-          text: newTodo,
-          completed: false,
-          xp: xpByDifficulty[newTodoDifficulty],
-          category: newTodoCategory,
-          difficulty: newTodoDifficulty,
-        },
-      ])
+      const task = {
+        user_id: userInfo.user_id,
+        name: newTodo,
+        category: newTodoCategory,
+        xp_value: xpByDifficulty[newTodoDifficulty],
+        status: "pending",
+      }
+      const newTask = await addTask(task)
+      if (newTask) setTodos([newTask, ...todos])
       setNewTodo("")
     }
   }
 
-  const deleteTodo = (id: number) => {
-    setTodos(todos.filter((todo) => todo.id !== id))
+  const deleteTodo = async (id: string) => {
+    await deleteTask(id)
+    setTodos(todos.filter((todo) => todo.task_id !== id))
   }
 
-  const updateTodo = (id: number, updates: Partial<Todo>) => {
-    setTodos(todos.map((todo) => (todo.id === id ? { ...todo, ...updates } : todo)))
+  const updateTodo = async (id: string, updates: Partial<Todo>) => {
+    await updateTask(id, updates)
+    setTodos(todos.map((todo) => (todo.task_id === id ? { ...todo, ...updates } : todo)))
     setEditingTodo(null)
   }
 
@@ -1072,13 +1110,13 @@ export default function ProductivityDashboard() {
                               <div className="space-y-2">
                                 <Input
                                   value={todo.text}
-                                  onChange={(e) => updateTodo(todo.id, { text: e.target.value })}
+                                  onChange={(e) => updateTodo(todo.id.toString(), { text: e.target.value })}
                                   className="bg-gray-600 border-gray-500 text-white"
                                 />
                                 <div className="flex gap-2">
                                   <Select
                                     value={todo.category}
-                                    onValueChange={(value) => updateTodo(todo.id, { category: value })}
+                                    onValueChange={(value) => updateTodo(todo.id.toString(), { category: value })}
                                   >
                                     <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
                                       <SelectValue />
@@ -1095,7 +1133,7 @@ export default function ProductivityDashboard() {
                                     value={todo.difficulty}
                                     onValueChange={(value: "Easy" | "Medium" | "Hard") => {
                                       const xpByDifficulty = { Easy: 10, Medium: 20, Hard: 30 }
-                                      updateTodo(todo.id, { difficulty: value, xp: xpByDifficulty[value] })
+                                      updateTodo(todo.id.toString(), { difficulty: value, xp: xpByDifficulty[value] })
                                     }}
                                   >
                                     <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
@@ -1143,7 +1181,7 @@ export default function ProductivityDashboard() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => deleteTodo(todo.id)}
+                              onClick={() => deleteTodo(todo.id.toString())}
                               className="p-1 h-8 w-8 text-red-400 hover:text-red-300"
                             >
                               <Trash2 className="w-4 h-4" />

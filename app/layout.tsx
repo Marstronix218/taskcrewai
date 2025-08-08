@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import AuthGuard from './AuthGuard'
 
 export const metadata: Metadata = {
   title: 'TaskCrewAI',
@@ -14,7 +15,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body suppressHydrationWarning={true}>{children}</body>
+      <body suppressHydrationWarning={true}>
+        <AuthGuard>{children}</AuthGuard>
+      </body>
     </html>
   )
 }
