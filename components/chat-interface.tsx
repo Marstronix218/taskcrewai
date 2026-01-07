@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { callOpenAI, createCharacterPrompt } from "@/lib/openai"
-import { ArrowLeft, Send, MoreVertical, Heart, Zap, Menu, X } from "lucide-react"
+import { ArrowLeft, Send, MoreVertical, Heart, Zap, Menu, X, Target } from "lucide-react"
 
 interface Message {
   id: number
@@ -40,6 +40,7 @@ interface Todo {
   xp: number
   category: string
   difficulty: "Easy" | "Medium" | "Hard"
+  assignedCharacterId?: number
 }
 
 interface ChatInterfaceProps {
@@ -177,6 +178,10 @@ export default function ChatInterface({
     "🎉 Celebrate progress",
   ]
 
+  // Get tasks assigned to this character
+  const assignedTasks = userTasks.filter(task => task.assignedCharacterId === character.id && !task.completed)
+  const assignedTaskTitles = assignedTasks.map(task => task.text)
+
   return (
     <div className="flex flex-col h-full bg-gray-900">
       {/* Header */}
@@ -189,6 +194,12 @@ export default function ChatInterface({
           <div>
             <h2 className="font-semibold text-white">{character.name}</h2>
             <p className="text-sm text-gray-400">{character.personality}</p>
+            {assignedTasks.length > 0 && (
+              <p className="text-xs text-blue-400 mt-1">
+                Working on: {assignedTasks[0].text}
+                {assignedTasks.length > 1 && ` (+${assignedTasks.length - 1} more)`}
+              </p>
+            )}
           </div>
         </div>
 
@@ -205,6 +216,22 @@ export default function ChatInterface({
           </Button>
         </div>
       </div>
+
+      {/* Assigned Tasks Banner */}
+      {assignedTasks.length > 0 && (
+        <div className="px-4 py-2 bg-blue-900/30 border-b border-blue-700/50">
+          <div className="flex items-center gap-2 text-sm">
+            <Target className="w-4 h-4 text-blue-400" />
+            <span className="text-blue-300 font-medium">
+              {assignedTasks.length} task{assignedTasks.length !== 1 ? "s" : ""} assigned to {character.name}
+            </span>
+            <span className="text-blue-400/70 text-xs">
+              {assignedTaskTitles.slice(0, 2).join(", ")}
+              {assignedTaskTitles.length > 2 && `, +${assignedTaskTitles.length - 2} more`}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900">

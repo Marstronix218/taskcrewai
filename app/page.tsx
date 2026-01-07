@@ -55,6 +55,7 @@ interface Todo {
   xp: number
   category: string
   difficulty: "Easy" | "Medium" | "Hard"
+  assignedCharacterId?: number // Optional for backward compatibility with existing tasks
 }
 
 interface ChatHistory {
@@ -72,6 +73,7 @@ export default function ProductivityDashboard() {
   const [newTodo, setNewTodo] = useState("")
   const [newTodoCategory, setNewTodoCategory] = useState("General")
   const [newTodoDifficulty, setNewTodoDifficulty] = useState<"Easy" | "Medium" | "Hard">("Easy")
+  const [newTodoAssignedCharacterId, setNewTodoAssignedCharacterId] = useState<number | "">("")
   const [editingTodo, setEditingTodo] = useState<number | null>(null)
   const [currentView, setCurrentView] = useState<"dashboard" | "chat" | "characters" | "premium" | "profile">(
     "dashboard",
@@ -574,7 +576,7 @@ export default function ProductivityDashboard() {
   }
 
   const addTodo = () => {
-    if (newTodo.trim()) {
+    if (newTodo.trim() && newTodoAssignedCharacterId !== "" && userCompanions.length > 0) {
       const xpByDifficulty = { Easy: 10, Medium: 20, Hard: 30 }
       setTodos([
         ...todos,
@@ -585,9 +587,11 @@ export default function ProductivityDashboard() {
           xp: xpByDifficulty[newTodoDifficulty],
           category: newTodoCategory,
           difficulty: newTodoDifficulty,
+          assignedCharacterId: newTodoAssignedCharacterId as number,
         },
       ])
       setNewTodo("")
+      setNewTodoAssignedCharacterId("")
     }
   }
 
@@ -1027,7 +1031,11 @@ export default function ProductivityDashboard() {
                           onKeyPress={(e) => e.key === "Enter" && addTodo()}
                           className="bg-gray-700 border-gray-600 text-white"
                         />
-                        <Button onClick={addTodo} size="sm">
+                        <Button 
+                          onClick={addTodo} 
+                          size="sm"
+                          disabled={!newTodo.trim() || newTodoAssignedCharacterId === "" || userCompanions.length === 0}
+                        >
                           <Plus className="w-4 h-4" />
                         </Button>
                       </div>
@@ -1055,6 +1063,31 @@ export default function ProductivityDashboard() {
                             <SelectItem value="Easy">Easy (10 XP)</SelectItem>
                             <SelectItem value="Medium">Medium (20 XP)</SelectItem>
                             <SelectItem value="Hard">Hard (30 XP)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={newTodoAssignedCharacterId === "" ? "" : String(newTodoAssignedCharacterId)}
+                          onValueChange={(value) => setNewTodoAssignedCharacterId(value === "" ? "" : Number(value))}
+                          required
+                        >
+                          <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                            <SelectValue placeholder="Companion *">
+                              {newTodoAssignedCharacterId !== "" && userCompanions.find(c => c.id === newTodoAssignedCharacterId)?.name}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {userCompanions.map((companion) => (
+                              <SelectItem key={companion.id} value={String(companion.id)}>
+                                <div className="flex items-center gap-2">
+                                  <img 
+                                    src={companion.avatar || "/placeholder.svg"} 
+                                    alt={companion.name}
+                                    className="w-5 h-5 rounded-full object-cover"
+                                  />
+                                  <span>{companion.name}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -1121,6 +1154,23 @@ export default function ProductivityDashboard() {
                                   <Badge variant="outline" className="text-xs text-gray-300 border-gray-500">
                                     {todo.difficulty}
                                   </Badge>
+                                  {todo.assignedCharacterId ? (
+                                    <Badge variant="outline" className="text-xs text-white border-blue-500 flex items-center gap-1">
+                                      <Avatar className="w-3 h-3">
+                                        <AvatarImage 
+                                          src={userCompanions.find(c => c.id === todo.assignedCharacterId)?.avatar || "/placeholder.svg"} 
+                                        />
+                                        <AvatarFallback className="text-[8px]">
+                                          {userCompanions.find(c => c.id === todo.assignedCharacterId)?.name[0] || "?"}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      {userCompanions.find(c => c.id === todo.assignedCharacterId)?.name || "Unknown"}
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-xs text-gray-500 border-gray-600">
+                                      Unassigned
+                                    </Badge>
+                                  )}
                                   <span className="text-xs text-purple-400">
                                     +{Math.floor(todo.xp * xpMultiplier)} XP
                                     {xpMultiplier > 1 && (
