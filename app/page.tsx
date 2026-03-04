@@ -39,7 +39,7 @@ import {
 import ChatInterface from "@/components/chat-interface"
 import CharacterSelection from "@/components/character-selection"
 import PremiumFeatures from "@/components/premium-features"
-import UserProfile from "@/components/user-profile"
+import UserProfilePanel from "@/components/user-profile"
 import {
   type Character,
   getTaskCompletionMessage,
@@ -50,10 +50,12 @@ import {
 import {
   deleteUserProfile,
   getUserProfile,
+  supabase,
   type Message as SupabaseMessage,
   upsertUserProfile,
-  type UserProfile,
+  type UserProfile as SupabaseUserProfile,
 } from "@/lib/supabase"
+import { useRouter } from "next/navigation"
 
 interface Todo {
   id: number
@@ -69,18 +71,8 @@ interface ChatHistory {
   [characterId: number]: any[]
 }
 
-const LOCAL_USER_ID_KEY = "taskcrewai_user_id"
-
-const getOrCreateLocalUserId = () => {
-  const existing = localStorage.getItem(LOCAL_USER_ID_KEY)
-  if (existing) return existing
-
-  const newId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `user-${Date.now()}`
-  localStorage.setItem(LOCAL_USER_ID_KEY, newId)
-  return newId
-}
-
 export default function ProductivityDashboard() {
+  const router = useRouter()
   const [todos, setTodos] = useState<Todo[]>([
     { id: 1, text: "Complete morning workout", completed: false, xp: 25, category: "Health", difficulty: "Medium" },
     { id: 2, text: "Review project proposal", completed: true, xp: 15, category: "Work", difficulty: "Easy" },
@@ -277,15 +269,16 @@ export default function ProductivityDashboard() {
   ])
   const [userId, setUserId] = useState<string>("")
   const [isProfileLoaded, setIsProfileLoaded] = useState(false)
+  const [isAuthChecked, setIsAuthChecked] = useState(false)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const toTaskData = (items: Todo[]) =>
+  const toTaskData = (items: Todo[]): SupabaseUserProfile["tasks"] =>
     items.map((todo) => ({
       task_id: String(todo.id),
       name: todo.text,
       category: todo.category as "Health" | "Work" | "Study" | "Personal" | "General",
       xp_value: todo.xp,
-      status: todo.completed ? "completed" : "pending",
+      status: (todo.completed ? "completed" : "pending") as "completed" | "pending",
       created_at: new Date().toISOString(),
       completed_at: todo.completed ? new Date().toISOString() : undefined,
     }))
@@ -311,7 +304,7 @@ export default function ProductivityDashboard() {
     const output: { [characterId: number]: SupabaseMessage[] } = {}
 
     Object.entries(history).forEach(([characterId, messages]) => {
-      output[Number(characterId)] = (messages || []).map((message) => ({
+      output[Number(characterId)] = (messages || []).map((message: any) => ({
         ...message,
         timestamp: message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp),
       }))
@@ -320,10 +313,10 @@ export default function ProductivityDashboard() {
     return output
   }
 
-  const fromTaskData = (tasks: UserProfile["tasks"]): Todo[] => {
+  const fromTaskData = (tasks: SupabaseUserProfile["tasks"]): Todo[] => {
     if (!tasks || tasks.length === 0) return []
 
-    return tasks.map((task) => ({
+    return tasks.map((task: SupabaseUserProfile["tasks"][number]) => ({
       id: Number(task.task_id),
       text: task.name,
       completed: task.status === "completed",
@@ -333,13 +326,14 @@ export default function ProductivityDashboard() {
     }))
   }
 
-  const fromChatHistory = (history: UserProfile["chat_history"]): ChatHistory => {
+  const fromChatHistory = (history: SupabaseUserProfile["chat_history"]): ChatHistory => {
     const output: ChatHistory = {}
 
     if (!history) return output
 
     Object.entries(history).forEach(([characterId, messages]) => {
-      output[Number(characterId)] = (messages || []).map((message) => ({
+      const typedMessages = Array.isArray(messages) ? (messages as SupabaseMessage[]) : []
+      output[Number(characterId)] = typedMessages.map((message: SupabaseMessage) => ({
         ...message,
         timestamp: new Date(message.timestamp),
       }))
@@ -349,9 +343,27 @@ export default function ProductivityDashboard() {
   }
 
   useEffect(() => {
+    let isMounted = true
+
     const hydrateProfile = async () => {
-      const resolvedUserId = getOrCreateLocalUserId()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session?.user) {
+        if (isMounted) {
+          setIsAuthChecked(true)
+          router.replace("/login")
+        }
+        return
+      }
+
+      const resolvedUserId = session.user.id
       setUserId(resolvedUserId)
+      setUserInfo((prev) => ({
+        ...prev,
+        email: session.user.email || prev.email,
+      }))
 
       const profile = await getUserProfile(resolvedUserId)
 
@@ -379,9 +391,8 @@ export default function ProductivityDashboard() {
         setLastCheckinTime(profile.last_checkin_time || 0)
 
         if (companionIds.length > 0) {
-          setUserCompanions(
-            companionIds
-              .map((id) => {
+          const hydratedCompanions = companionIds
+            .map((id): Character | null => {
                 const base = allCharacters.find((character) => character.id === id)
                 const progress = profile.crew.find((member) => member.id === id)
                 const lastCharacterMessage = (loadedChatHistory[id] || []).filter((m) => m.sender === "character").pop()
@@ -397,19 +408,50 @@ export default function ProductivityDashboard() {
                   lastMessage: lastCharacterMessage?.text || "",
                 }
               })
-              .filter((character): character is Character => Boolean(character)),
-          )
+            .filter((character): character is Character => character !== null)
+
+          setUserCompanions(hydratedCompanions)
         }
       } else {
         const randomUsername = `User${Math.floor(Math.random() * 10000)}`
-        setUserInfo((prev) => ({ ...prev, username: randomUsername }))
+        setUserInfo((prev) => ({
+          ...prev,
+          username: randomUsername,
+          email: session.user.email || prev.email,
+        }))
       }
 
-      setIsProfileLoaded(true)
+      if (isMounted) {
+        setIsProfileLoaded(true)
+        setIsAuthChecked(true)
+      }
     }
 
     hydrateProfile()
-  }, [])
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) {
+        setUserId("")
+        setIsProfileLoaded(false)
+        setIsAuthChecked(true)
+        router.replace("/login")
+        return
+      }
+
+      setUserId(session.user.id)
+      setUserInfo((prev) => ({
+        ...prev,
+        email: session.user.email || prev.email,
+      }))
+    })
+
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
+  }, [router])
 
   useEffect(() => {
     if (!isProfileLoaded || !userId) return
@@ -419,7 +461,7 @@ export default function ProductivityDashboard() {
     }
 
     saveTimeoutRef.current = setTimeout(async () => {
-      const payload: UserProfile = {
+      const payload: SupabaseUserProfile = {
         user_id: userId,
         username: userInfo.username,
         email: userInfo.email,
@@ -895,10 +937,13 @@ export default function ProductivityDashboard() {
     return message.length > maxLength ? message.substring(0, maxLength) + "..." : message
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem(LOCAL_USER_ID_KEY)
-    setSystemMessages((prev) => [...prev, "Logged out locally. Refresh to start a new local profile."])
-    console.log("Logout clicked")
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut()
+    if (error) {
+      setSystemMessages((prev) => [...prev, "Failed to log out."])
+      return
+    }
+    router.replace("/login")
   }
 
   const handleUpgrade = () => {
@@ -924,8 +969,8 @@ export default function ProductivityDashboard() {
       }
     }
 
-    localStorage.removeItem(LOCAL_USER_ID_KEY)
-    setSystemMessages((prev) => [...prev, "Account deleted. Refresh to create a new local profile."])
+    await supabase.auth.signOut()
+    router.replace("/login")
   }
 
   const handleSendFeedback = (feedback: string) => {
@@ -940,6 +985,14 @@ export default function ProductivityDashboard() {
 
   // Generate available characters based on plan
   const availableCharacters = userInfo.plan === "Premium" ? allCharacters : allCharacters.slice(0, 5)
+
+  if (!isAuthChecked) {
+    return <div className="min-h-screen bg-gray-900 text-white p-6">Checking session...</div>
+  }
+
+  if (!isProfileLoaded) {
+    return <div className="min-h-screen bg-gray-900 text-white p-6">Loading your workspace...</div>
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -1474,7 +1527,7 @@ export default function ProductivityDashboard() {
             <PremiumFeatures userPlan={userInfo.plan} onUpgrade={handleUpgrade} />
           </div>
         ) : currentView === "profile" ? (
-          <UserProfile
+          <UserProfilePanel
             userInfo={userInfo}
             onBack={backToDashboard}
             onUpdateUsername={updateUsername}

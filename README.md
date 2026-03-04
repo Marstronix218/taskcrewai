@@ -59,6 +59,7 @@ TaskCrewAI is a gamified productivity dashboard and AI companion app. Boost your
    Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Usage
+- Sign up or sign in on `/login`.
 - Add, complete, and manage your daily tasks.
 - Select and chat with AI companions for motivation and advice.
 - Track your XP, streaks, and bond levels.
@@ -76,6 +77,7 @@ TaskCrewAI is a gamified productivity dashboard and AI companion app. Boost your
 
 ## Notes
 - Apply the SQL in `supabase/schema.sql` to your Supabase project before running the app.
+- The dashboard route (`/`) requires an authenticated Supabase session.
 - All AI chat features require a valid OpenAI API key.
 - Some features (Premium, account management) are simulated in the current version.
 

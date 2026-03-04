@@ -1,7 +1,7 @@
 create extension if not exists pgcrypto;
 
 create table if not exists public.user_profiles (
-  user_id text primary key,
+  user_id uuid primary key references auth.users(id) on delete cascade,
   username text not null,
   email text not null,
   plan text not null check (plan in ('Free', 'Premium')),
@@ -38,8 +38,32 @@ execute function public.set_user_profiles_updated_at();
 alter table public.user_profiles enable row level security;
 
 drop policy if exists "anon can manage own user_id profile" on public.user_profiles;
-create policy "anon can manage own user_id profile"
+drop policy if exists "users can select own profile" on public.user_profiles;
+drop policy if exists "users can insert own profile" on public.user_profiles;
+drop policy if exists "users can update own profile" on public.user_profiles;
+drop policy if exists "users can delete own profile" on public.user_profiles;
+
+create policy "users can select own profile"
 on public.user_profiles
-for all
-using (true)
-with check (true);
+for select
+to authenticated
+using (auth.uid() = user_id);
+
+create policy "users can insert own profile"
+on public.user_profiles
+for insert
+to authenticated
+with check (auth.uid() = user_id);
+
+create policy "users can update own profile"
+on public.user_profiles
+for update
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create policy "users can delete own profile"
+on public.user_profiles
+for delete
+to authenticated
+using (auth.uid() = user_id);

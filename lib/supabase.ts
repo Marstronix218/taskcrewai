@@ -60,6 +60,9 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   const { data, error } = await supabase.from("user_profiles").select("*").eq("user_id", userId).single()
 
   if (error) {
+    if (error.code === "PGRST116") {
+      return null
+    }
     console.error("Error fetching user profile:", error)
     return null
   }
