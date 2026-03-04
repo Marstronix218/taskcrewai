@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -47,6 +47,13 @@ import {
   getBondLevelMessage,
   getMissedTasksMessage,
 } from "@/lib/character_reactions"
+import {
+  deleteUserProfile,
+  getUserProfile,
+  type Message as SupabaseMessage,
+  upsertUserProfile,
+  type UserProfile,
+} from "@/lib/supabase"
 
 interface Todo {
   id: number
@@ -60,6 +67,17 @@ interface Todo {
 
 interface ChatHistory {
   [characterId: number]: any[]
+}
+
+const LOCAL_USER_ID_KEY = "taskcrewai_user_id"
+
+const getOrCreateLocalUserId = () => {
+  const existing = localStorage.getItem(LOCAL_USER_ID_KEY)
+  if (existing) return existing
+
+  const newId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `user-${Date.now()}`
+  localStorage.setItem(LOCAL_USER_ID_KEY, newId)
+  return newId
 }
 
 export default function ProductivityDashboard() {
@@ -97,14 +115,6 @@ export default function ProductivityDashboard() {
     avatar: "/placeholder.svg?height=40&width=40",
     messageCount: { 1: 5, 2: 3, 3: 8 } as Record<number, number>, // Daily message count per character
   })
-
-  // Generate random username on client side only
-  useEffect(() => {
-    setUserInfo(prev => ({
-      ...prev,
-      username: `User${Math.floor(Math.random() * 10000)}`
-    }))
-  }, [])
 
   // Available characters (10 total) - Starting with bond level 0
   const allCharacters: Character[] = [
@@ -264,6 +274,191 @@ export default function ProductivityDashboard() {
     allCharacters[0], // Annie
     allCharacters[1], // Ken
     allCharacters[2], // Nagisa
+  ])
+  const [userId, setUserId] = useState<string>("")
+  const [isProfileLoaded, setIsProfileLoaded] = useState(false)
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const toTaskData = (items: Todo[]) =>
+    items.map((todo) => ({
+      task_id: String(todo.id),
+      name: todo.text,
+      category: todo.category as "Health" | "Work" | "Study" | "Personal" | "General",
+      xp_value: todo.xp,
+      status: todo.completed ? "completed" : "pending",
+      created_at: new Date().toISOString(),
+      completed_at: todo.completed ? new Date().toISOString() : undefined,
+    }))
+
+  const toCrewData = (companions: Character[]) =>
+    companions.map((companion) => ({
+      id: companion.id,
+      level: companion.level,
+      xp: companion.xp,
+      tasks_completed: companion.tasksCompleted,
+    }))
+
+  const toBondLevels = (companions: Character[]) =>
+    companions.reduce(
+      (acc, companion) => {
+        acc[companion.id] = companion.bondLevel
+        return acc
+      },
+      {} as { [characterId: number]: number },
+    )
+
+  const toSerializableChatHistory = (history: ChatHistory) => {
+    const output: { [characterId: number]: SupabaseMessage[] } = {}
+
+    Object.entries(history).forEach(([characterId, messages]) => {
+      output[Number(characterId)] = (messages || []).map((message) => ({
+        ...message,
+        timestamp: message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp),
+      }))
+    })
+
+    return output
+  }
+
+  const fromTaskData = (tasks: UserProfile["tasks"]): Todo[] => {
+    if (!tasks || tasks.length === 0) return []
+
+    return tasks.map((task) => ({
+      id: Number(task.task_id),
+      text: task.name,
+      completed: task.status === "completed",
+      xp: task.xp_value,
+      category: task.category,
+      difficulty: task.xp_value >= 30 ? "Hard" : task.xp_value >= 20 ? "Medium" : "Easy",
+    }))
+  }
+
+  const fromChatHistory = (history: UserProfile["chat_history"]): ChatHistory => {
+    const output: ChatHistory = {}
+
+    if (!history) return output
+
+    Object.entries(history).forEach(([characterId, messages]) => {
+      output[Number(characterId)] = (messages || []).map((message) => ({
+        ...message,
+        timestamp: new Date(message.timestamp),
+      }))
+    })
+
+    return output
+  }
+
+  useEffect(() => {
+    const hydrateProfile = async () => {
+      const resolvedUserId = getOrCreateLocalUserId()
+      setUserId(resolvedUserId)
+
+      const profile = await getUserProfile(resolvedUserId)
+
+      if (profile) {
+        const loadedTodos = fromTaskData(profile.tasks)
+        const loadedChatHistory = fromChatHistory(profile.chat_history)
+        const companionIds = profile.crew?.map((member) => member.id) || []
+
+        if (loadedTodos.length > 0) {
+          setTodos(loadedTodos)
+        }
+
+        setChatHistories(loadedChatHistory)
+        setUserInfo((prev) => ({
+          ...prev,
+          username: profile.username || prev.username,
+          email: profile.email || prev.email,
+          plan: profile.plan || prev.plan,
+          messageCount: profile.message_count || prev.messageCount,
+        }))
+        setTotalXP(profile.total_xp || 0)
+        setStreakCount(profile.streak_count || 0)
+        setLastTaskCheck(profile.last_task_check || new Date().toDateString())
+        setLastLogin(profile.last_login || new Date().toDateString())
+        setLastCheckinTime(profile.last_checkin_time || 0)
+
+        if (companionIds.length > 0) {
+          setUserCompanions(
+            companionIds
+              .map((id) => {
+                const base = allCharacters.find((character) => character.id === id)
+                const progress = profile.crew.find((member) => member.id === id)
+                const lastCharacterMessage = (loadedChatHistory[id] || []).filter((m) => m.sender === "character").pop()
+
+                if (!base || !progress) return null
+
+                return {
+                  ...base,
+                  level: progress.level,
+                  xp: progress.xp,
+                  tasksCompleted: progress.tasks_completed,
+                  bondLevel: profile.bond_levels?.[id] || 0,
+                  lastMessage: lastCharacterMessage?.text || "",
+                }
+              })
+              .filter((character): character is Character => Boolean(character)),
+          )
+        }
+      } else {
+        const randomUsername = `User${Math.floor(Math.random() * 10000)}`
+        setUserInfo((prev) => ({ ...prev, username: randomUsername }))
+      }
+
+      setIsProfileLoaded(true)
+    }
+
+    hydrateProfile()
+  }, [])
+
+  useEffect(() => {
+    if (!isProfileLoaded || !userId) return
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+    }
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      const payload: UserProfile = {
+        user_id: userId,
+        username: userInfo.username,
+        email: userInfo.email,
+        plan: userInfo.plan,
+        total_xp: totalXP,
+        streak_count: streakCount,
+        crew: toCrewData(userCompanions),
+        bond_levels: toBondLevels(userCompanions),
+        chat_history: toSerializableChatHistory(chatHistories),
+        tasks: toTaskData(todos),
+        last_task_check: lastTaskCheck,
+        message_count: userInfo.messageCount,
+        last_login: lastLogin,
+        last_checkin_time: lastCheckinTime,
+      }
+
+      const saved = await upsertUserProfile(payload)
+      if (!saved) {
+        setSystemMessages((prev) => [...prev, "Failed to sync data to Supabase. Please check DB schema/policies."])
+      }
+    }, 800)
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [
+    isProfileLoaded,
+    userId,
+    userInfo,
+    totalXP,
+    streakCount,
+    userCompanions,
+    chatHistories,
+    todos,
+    lastTaskCheck,
+    lastLogin,
+    lastCheckinTime,
   ])
 
   // Check for missed tasks at end of day
@@ -701,7 +896,8 @@ export default function ProductivityDashboard() {
   }
 
   const handleLogout = () => {
-    // Will implement with Supabase later
+    localStorage.removeItem(LOCAL_USER_ID_KEY)
+    setSystemMessages((prev) => [...prev, "Logged out locally. Refresh to start a new local profile."])
     console.log("Logout clicked")
   }
 
@@ -719,10 +915,17 @@ export default function ProductivityDashboard() {
     setSystemMessages((prev) => [...prev, "Premium plan cancelled. You're now on the Free plan."])
   }
 
-  const handleDeleteAccount = () => {
-    // Will implement with Supabase later
-    console.log("Delete account clicked")
-    setSystemMessages((prev) => [...prev, "Account deletion requested. This feature will be implemented soon."])
+  const handleDeleteAccount = async () => {
+    if (userId) {
+      const deleted = await deleteUserProfile(userId)
+      if (!deleted) {
+        setSystemMessages((prev) => [...prev, "Failed to delete account from Supabase."])
+        return
+      }
+    }
+
+    localStorage.removeItem(LOCAL_USER_ID_KEY)
+    setSystemMessages((prev) => [...prev, "Account deleted. Refresh to create a new local profile."])
   }
 
   const handleSendFeedback = (feedback: string) => {

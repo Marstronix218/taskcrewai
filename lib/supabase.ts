@@ -12,12 +12,15 @@ export interface UserProfile {
   plan: "Free" | "Premium"
   total_xp: number
   streak_count: number
+  message_count?: { [characterId: number]: number }
   crew: CharacterData[]
   bond_levels: { [characterId: number]: number }
   chat_history: { [characterId: number]: Message[] }
   custom_character?: CustomCharacter
   tasks: TaskData[]
   last_task_check: string
+  last_login?: string
+  last_checkin_time?: number
 }
 
 export interface CharacterData {
@@ -80,6 +83,28 @@ export async function createUserProfile(profile: UserProfile) {
 
   if (error) {
     console.error("Error creating user profile:", error)
+    return false
+  }
+
+  return true
+}
+
+export async function upsertUserProfile(profile: UserProfile) {
+  const { error } = await supabase.from("user_profiles").upsert(profile, { onConflict: "user_id" })
+
+  if (error) {
+    console.error("Error upserting user profile:", error)
+    return false
+  }
+
+  return true
+}
+
+export async function deleteUserProfile(userId: string) {
+  const { error } = await supabase.from("user_profiles").delete().eq("user_id", userId)
+
+  if (error) {
+    console.error("Error deleting user profile:", error)
     return false
   }
 
