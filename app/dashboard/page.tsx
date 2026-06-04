@@ -106,6 +106,10 @@ export default function Dashboard() {
   const [focusMinutesTotal, setFocusMinutesTotal] = useState(0)
   const [xpToday, setXpToday] = useState(0)
   const [xpTodayDate, setXpTodayDate] = useState(todayIso())
+  // Daily goal is frozen for the day (set at day-start from the level then) so a
+  // mid-day level-up can't move the target — which would otherwise re-fire the
+  // "goal reached" celebration and desync the ring.
+  const [dailyGoal, setDailyGoal] = useState(50)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [celebrationQueue, setCelebrationQueue] = useState<(Celebration & { key: number })[]>([])
   const [floatingXp, setFloatingXp] = useState<{ id: number; xp: number } | null>(null)
@@ -194,9 +198,11 @@ export default function Dashboard() {
       if (profile.xp_today_date === todayIso()) {
         setXpToday(profile.xp_today || 0)
         setXpTodayDate(profile.xp_today_date)
+        setDailyGoal(profile.daily_goal ?? dailyGoalForLevel(userLevelForXp(profile.total_xp || 0)))
       } else {
         setXpToday(0)
         setXpTodayDate(todayIso())
+        setDailyGoal(dailyGoalForLevel(userLevelForXp(profile.total_xp || 0)))
       }
       setLastTaskCheck(profile.last_task_check || todayIso())
       setLastLogin(profile.last_login || todayIso())
@@ -254,6 +260,7 @@ export default function Dashboard() {
         focus_minutes_total: focusMinutesTotal,
         xp_today: xpToday,
         xp_today_date: xpTodayDate,
+        daily_goal: dailyGoal,
         sound_enabled: soundEnabled,
         onboarded: true,
       }
@@ -266,7 +273,7 @@ export default function Dashboard() {
   }, [
     isProfileLoaded, userId, userInfo, totalXP, streakCount, userCompanions,
     chatHistories, todos, lastTaskCheck, lastLogin, lastCheckinTime, dailyQuests,
-    streakFreezes, focusMinutesTotal, xpToday, xpTodayDate, soundEnabled,
+    streakFreezes, focusMinutesTotal, xpToday, xpTodayDate, dailyGoal, soundEnabled,
   ])
 
   useEffect(() => {
@@ -299,6 +306,7 @@ export default function Dashboard() {
     )
     setXpToday(0)
     setXpTodayDate(today)
+    setDailyGoal(dailyGoalForLevel(userLevelForXp(totalXP)))
     setDailyQuests(generateDailyQuests(today, userCompanions))
     setLastLogin(today)
   }, [isProfileLoaded, userCompanions])
@@ -470,7 +478,7 @@ export default function Dashboard() {
       newStreak,
       oldXpToday,
       newXpToday,
-      dailyGoal: dailyGoalForLevel(userLevelForXp(oldTotalXp)),
+      dailyGoal,
       focusCharacter,
       characterLevelUps,
       bondLevelUps,
@@ -826,7 +834,7 @@ export default function Dashboard() {
               <div className="lg:col-span-2 space-y-4">
                 <DailyGoalRing
                   xpToday={xpToday}
-                  goal={dailyGoalForLevel(userLevelForXp(totalXP))}
+                  goal={dailyGoal}
                   level={userLevelForXp(totalXP)}
                 />
                 <DailyQuests quests={dailyQuests} companions={userCompanions} onComplete={completeDailyQuest} />

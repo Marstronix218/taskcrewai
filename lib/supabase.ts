@@ -73,6 +73,7 @@ export interface UserProfile {
   focus_minutes_total?: number
   xp_today?: number
   xp_today_date?: string
+  daily_goal?: number
   sound_enabled?: boolean
   onboarded?: boolean
   stripe_customer_id?: string | null
