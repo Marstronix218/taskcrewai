@@ -115,6 +115,7 @@ New persisted fields on `user_profiles` (idempotent `add column if not exists`):
 |---|---|---|---|
 | `xp_today` | int | 0 | XP earned today, drives the ring |
 | `xp_today_date` | text | — | ISO date the counter belongs to |
+| `daily_goal` | int | derived | Frozen per-day XP target for the ring + celebration |
 | `sound_enabled` | boolean | true | Mute preference |
 
 - Mirror these in the `UserProfile` interfaces in [lib/supabase.ts](lib/supabase.ts) and the React state shape; map them in [lib/profile-mapping.ts](lib/profile-mapping.ts).
