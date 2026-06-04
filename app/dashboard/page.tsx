@@ -1052,6 +1052,8 @@ export default function Dashboard() {
             onCancelPremium={handleCancelPremium}
             onDeleteAccount={handleDeleteAccount}
             onSendFeedback={() => setSystemMessages((p) => [...p, "System: Thanks for the feedback!"])}
+            soundEnabled={soundEnabled}
+            onToggleSound={(enabled) => setSoundEnabled(enabled)}
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
           />
