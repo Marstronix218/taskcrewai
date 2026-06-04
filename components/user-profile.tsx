@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ArrowLeft, User, CreditCard, MessageSquare, UserX, Save, AlertTriangle, Volume2 } from "lucide-react"
+import { ArrowLeft, User, CreditCard, MessageSquare, UserX, Save, AlertTriangle, Volume2, Sparkles } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
+import { PERSONAS, type PersonaId } from "@/lib/personas"
 
 interface UserInfo {
   username: string
@@ -27,6 +28,8 @@ interface UserProfileProps {
   onSendFeedback: (feedback: string) => void
   soundEnabled: boolean
   onToggleSound: (enabled: boolean) => void
+  persona: PersonaId | null
+  onUpdatePersona: (persona: PersonaId) => void
   sidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
 }
@@ -40,6 +43,8 @@ export default function UserProfile({
   onSendFeedback,
   soundEnabled,
   onToggleSound,
+  persona,
+  onUpdatePersona,
   sidebarOpen,
   setSidebarOpen,
 }: UserProfileProps) {
@@ -103,17 +108,17 @@ export default function UserProfile({
                         className="bg-gray-700 border-gray-600 text-white"
                         placeholder="Enter username"
                       />
-                      <Button onClick={handleSaveUsername} size="sm">
+                      <Button onClick={handleSaveUsername} size="sm" className="bg-purple-600 hover:bg-purple-700 text-white">
                         <Save className="w-4 h-4" />
                       </Button>
-                      <Button onClick={() => setEditingUsername(false)} variant="ghost" size="sm">
+                      <Button onClick={() => setEditingUsername(false)} variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-gray-700">
                         Cancel
                       </Button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <span className="text-white font-medium">{userInfo.username}</span>
-                      <Button onClick={() => setEditingUsername(true)} variant="ghost" size="sm">
+                      <Button onClick={() => setEditingUsername(true)} variant="ghost" size="sm" className="text-purple-300 hover:text-white hover:bg-gray-700">
                         Edit
                       </Button>
                     </div>
@@ -124,6 +129,40 @@ export default function UserProfile({
                   <span className="text-white">{userInfo.email}</span>
                 </div>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Persona */}
+        <Card className="bg-gray-800 border-gray-700 text-white">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Sparkles className="w-5 h-5" />
+              Your persona
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-gray-400 text-sm">
+              Your crew tailors their advice to this. Pick the one that fits you best.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {PERSONAS.map((p) => {
+                const isSelected = persona === p.id
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => onUpdatePersona(p.id)}
+                    className={`p-3 rounded-lg border text-left transition ${
+                      isSelected
+                        ? "border-purple-500 bg-purple-500/10"
+                        : "border-gray-700 bg-gray-900/40 hover:border-gray-600"
+                    }`}
+                  >
+                    <div className="text-xl mb-0.5">{p.emoji}</div>
+                    <p className="text-sm font-medium text-white">{p.label}</p>
+                  </button>
+                )
+              })}
             </div>
           </CardContent>
         </Card>
@@ -163,7 +202,7 @@ export default function UserProfile({
                   {userInfo.plan === "Premium" ? "Premium - $15/month" : "Free Plan"}
                 </p>
               </div>
-              <Badge variant={userInfo.plan === "Premium" ? "default" : "outline"}>{userInfo.plan}</Badge>
+              <Badge variant={userInfo.plan === "Premium" ? "default" : "outline"} className={userInfo.plan === "Premium" ? "bg-purple-600 text-white" : "text-white border-gray-500"}>{userInfo.plan}</Badge>
             </div>
 
             {userInfo.plan === "Premium" && (
@@ -178,7 +217,7 @@ export default function UserProfile({
                       <Button onClick={onCancelPremium} variant="destructive" size="sm">
                         Yes, Cancel Premium
                       </Button>
-                      <Button onClick={() => setShowCancelConfirm(false)} variant="ghost" size="sm">
+                      <Button onClick={() => setShowCancelConfirm(false)} variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-gray-700">
                         Keep Premium
                       </Button>
                     </div>
@@ -249,7 +288,7 @@ export default function UserProfile({
                   <Button onClick={onDeleteAccount} variant="destructive" size="sm">
                     Yes, Delete Account
                   </Button>
-                  <Button onClick={() => setShowDeleteConfirm(false)} variant="ghost" size="sm">
+                  <Button onClick={() => setShowDeleteConfirm(false)} variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-gray-700">
                     Cancel
                   </Button>
                 </div>

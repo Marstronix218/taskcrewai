@@ -9,10 +9,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Check, ArrowRight, Crown } from "lucide-react"
 import { ALL_CHARACTERS, FREE_PLAN_CHARACTER_LIMIT, FREE_PLAN_MAX_COMPANIONS } from "@/lib/characters"
+import { PERSONAS, type PersonaId } from "@/lib/personas"
 import { supabase, upsertUserProfile, getUserProfile } from "@/lib/supabase"
 import type { Character } from "@/lib/types"
 
-const STEPS = ["Welcome", "Name", "Crew", "Done"] as const
+const STEPS = ["Welcome", "Name", "You", "Crew", "Done"] as const
 
 export default function OnboardPage() {
   const router = useRouter()
@@ -20,6 +21,7 @@ export default function OnboardPage() {
   const [userId, setUserId] = useState<string>("")
   const [email, setEmail] = useState<string>("")
   const [username, setUsername] = useState<string>("")
+  const [persona, setPersona] = useState<PersonaId | null>(null)
   const [selected, setSelected] = useState<Character[]>([])
   const [saving, setSaving] = useState(false)
   const [checking, setChecking] = useState(true)
@@ -73,6 +75,7 @@ export default function OnboardPage() {
       last_task_check: today,
       last_login: today,
       message_count: {},
+      persona,
       onboarded: true,
       streak_freezes: 1,
     })
@@ -147,6 +150,54 @@ export default function OnboardPage() {
           <Card className="bg-gray-900 border-gray-800">
             <CardContent className="p-6 sm:p-8 space-y-4">
               <div>
+                <h2 className="text-2xl font-bold">What best describes you?</h2>
+                <p className="text-sm text-gray-400">
+                  Your crew uses this to tailor their advice to your life. You can change it anytime.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {PERSONAS.map((p) => {
+                  const isSelected = persona === p.id
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setPersona(p.id)}
+                      className={`relative p-4 rounded-xl border text-left transition ${
+                        isSelected
+                          ? "border-purple-500 bg-purple-500/10"
+                          : "border-gray-800 bg-gray-800/40 hover:border-gray-700"
+                      }`}
+                    >
+                      {isSelected && (
+                        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center">
+                          <Check className="w-3 h-3 text-white" />
+                        </div>
+                      )}
+                      <div className="text-2xl mb-1">{p.emoji}</div>
+                      <p className="text-sm font-medium text-white">{p.label}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5 line-clamp-2">{p.description}</p>
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="flex justify-between gap-2 pt-2">
+                <Button variant="ghost" onClick={() => setStep(1)} className="text-gray-300">Back</Button>
+                <Button
+                  onClick={() => setStep(3)}
+                  disabled={!persona}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  {persona ? "Next" : "Pick one"} <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {step === 3 && (
+          <Card className="bg-gray-900 border-gray-800">
+            <CardContent className="p-6 sm:p-8 space-y-4">
+              <div>
                 <h2 className="text-2xl font-bold">Pick your starting crew</h2>
                 <p className="text-sm text-gray-400">
                   Choose up to {FREE_PLAN_MAX_COMPANIONS}. You can swap them later.
@@ -194,9 +245,9 @@ export default function OnboardPage() {
                 })}
               </div>
               <div className="flex justify-between gap-2 pt-2">
-                <Button variant="ghost" onClick={() => setStep(1)} className="text-gray-300">Back</Button>
+                <Button variant="ghost" onClick={() => setStep(2)} className="text-gray-300">Back</Button>
                 <Button
-                  onClick={() => setStep(3)}
+                  onClick={() => setStep(4)}
                   disabled={selected.length === 0}
                   className="bg-purple-600 hover:bg-purple-700"
                 >
@@ -208,7 +259,7 @@ export default function OnboardPage() {
           </Card>
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <Card className="bg-gray-900 border-gray-800">
             <CardContent className="p-8 text-center space-y-5">
               <h2 className="text-2xl font-bold">You're set, {username} 🎉</h2>

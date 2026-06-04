@@ -12,6 +12,31 @@ export interface OpenAIResponse {
   error?: string
 }
 
+// Companions should read like a real person texting, not a formatted AI answer.
+// Strip markdown asterisks (*bold*, *actions*) and dash-based bullets/separators,
+// while preserving hyphens inside words (e.g. "well-done", "9-to-5").
+export function humanizeReply(text: string): string {
+  if (!text) return text
+  let out = text
+  // Remove all asterisks (bold/italic/roleplay markers).
+  out = out.replace(/\*/g, "")
+  // Remove leading bullet markers at the start of any line.
+  out = out.replace(/^[ \t]*[-•]\s+/gm, "")
+  // Em/en dashes are a dead giveaway of AI text — turn them into commas (keep line breaks).
+  out = out.replace(/[ \t]*[—–][ \t]*/g, ", ")
+  // A hyphen used as a separator between spaces becomes a comma; intra-word hyphens stay.
+  out = out.replace(/ +-+ +/g, ", ")
+  // Collapse any doubled commas the substitutions may have created.
+  out = out.replace(/ *,(?: *,)+/g, ",")
+  // Tidy up whitespace left behind.
+  out = out.replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim()
+  return out
+}
+
+// Plain-text + persona instructions shared by every companion prompt.
+const STYLE_INSTRUCTION =
+  "Write like a real person sending a casual text message. Do NOT use any markdown formatting: no asterisks, no bold, no italics, no bullet points, and no dashes for lists. Never use em dashes (—) or en dashes (–); use commas or separate sentences instead. Use plain sentences and emojis only."
+
 export async function callOpenAI(
   messages: ChatMessage[],
   options: {
@@ -48,7 +73,7 @@ export async function callOpenAI(
       throw new Error(data.error)
     }
 
-    return data.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.'
+    return humanizeReply(data.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.')
   } catch (error) {
     console.error('Error calling OpenAI:', error)
     throw error
@@ -59,12 +84,14 @@ export async function callOpenAI(
 export function createCharacterPrompt(
   characterPrompt: string,
   username: string,
-  taskContext?: string
+  taskContext?: string,
+  personaHint?: string
 ): ChatMessage[] {
+  const personaLine = personaHint ? `\n\n${personaHint}` : ""
   const messages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${characterPrompt}\n\nThe user's name is "${username}". You can use their name in conversation when appropriate.`,
+      content: `${characterPrompt}\n\nThe user's name is "${username}". You can use their name in conversation when appropriate.${personaLine}\n\n${STYLE_INSTRUCTION}`,
     }
   ]
 

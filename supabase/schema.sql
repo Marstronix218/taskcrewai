@@ -38,6 +38,7 @@ alter table public.user_profiles add column if not exists xp_today integer not n
 alter table public.user_profiles add column if not exists xp_today_date text;
 alter table public.user_profiles add column if not exists daily_goal integer not null default 50;
 alter table public.user_profiles add column if not exists sound_enabled boolean not null default true;
+alter table public.user_profiles add column if not exists persona text;
 
 create or replace function public.set_user_profiles_updated_at()
 returns trigger

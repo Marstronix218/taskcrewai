@@ -50,6 +50,8 @@ import DailyGoalRing from "@/components/daily-goal-ring"
 import UserLevelBadge from "@/components/user-level-badge"
 
 import { ALL_CHARACTERS, getAvailableCharacters, getMaxCompanions } from "@/lib/characters"
+import { getPersonaPromptHint, type PersonaId } from "@/lib/personas"
+import { humanizeReply } from "@/lib/openai"
 import {
   getBondLevelMessage,
   getLevelUpMessage,
@@ -111,6 +113,7 @@ export default function Dashboard() {
   // "goal reached" celebration and desync the ring.
   const [dailyGoal, setDailyGoal] = useState(50)
   const [soundEnabled, setSoundEnabled] = useState(true)
+  const [persona, setPersona] = useState<PersonaId | null>(null)
   const [celebrationQueue, setCelebrationQueue] = useState<(Celebration & { key: number })[]>([])
   const [floatingXp, setFloatingXp] = useState<{ id: number; xp: number } | null>(null)
   const celebrationKeyRef = useRef(0)
@@ -195,6 +198,7 @@ export default function Dashboard() {
       setStreakFreezes(profile.streak_freezes ?? 1)
       setFocusMinutesTotal(profile.focus_minutes_total || 0)
       setSoundEnabled(profile.sound_enabled ?? true)
+      setPersona((profile.persona as PersonaId) ?? null)
       if (profile.xp_today_date === todayIso()) {
         setXpToday(profile.xp_today || 0)
         setXpTodayDate(profile.xp_today_date)
@@ -262,6 +266,7 @@ export default function Dashboard() {
         xp_today_date: xpTodayDate,
         daily_goal: dailyGoal,
         sound_enabled: soundEnabled,
+        persona: persona,
         onboarded: true,
       }
       const ok = await upsertUserProfile(payload)
@@ -273,7 +278,7 @@ export default function Dashboard() {
   }, [
     isProfileLoaded, userId, userInfo, totalXP, streakCount, userCompanions,
     chatHistories, todos, lastTaskCheck, lastLogin, lastCheckinTime, dailyQuests,
-    streakFreezes, focusMinutesTotal, xpToday, xpTodayDate, dailyGoal, soundEnabled,
+    streakFreezes, focusMinutesTotal, xpToday, xpTodayDate, dailyGoal, soundEnabled, persona,
   ])
 
   useEffect(() => {
@@ -339,6 +344,7 @@ export default function Dashboard() {
   const hoursLeft = hoursLeftInDay()
   const availableCharacters = getAvailableCharacters(userInfo.plan)
   const maxCompanions = getMaxCompanions(userInfo.plan)
+  const personaHint = getPersonaPromptHint(persona)
 
   const generateAITaskMessage = async (character: Character, taskText: string, category: string): Promise<string> => {
     // Rotate through different reaction angles + a random seed so the same task doesn't
@@ -354,7 +360,8 @@ export default function Dashboard() {
       "Crack a small joke related to the task.",
     ]
     const angle = angles[Math.floor(Math.random() * angles.length)]
-    const prompt = `${character.prompt}\n\nThe user "${userInfo.username}" just completed this specific task: "${taskText}" (Category: ${category}). React in your characteristic style. ${angle} Make it personal and specific to THIS task — mention what they actually did ("${taskText}") and why finishing it matters, don't give a generic "good job". Write 2–4 sentences (roughly 40–80 words). Vary your wording, opening, and emojis — never reuse a phrasing you've used before. (seed: ${Math.random().toString(36).slice(2, 8)})`
+    const personaLine = personaHint ? `\n\n${personaHint}` : ""
+    const prompt = `${character.prompt}\n\nThe user "${userInfo.username}" just completed this specific task: "${taskText}" (Category: ${category}). React in your characteristic style. ${angle} Make it personal and specific to THIS task — mention what they actually did ("${taskText}") and why finishing it matters, don't give a generic "good job". Write 2–4 sentences (roughly 40–80 words). Vary your wording, opening, and emojis — never reuse a phrasing you've used before.${personaLine}\n\nWrite like a real person sending a casual text message. Do NOT use any markdown formatting: no asterisks, no bold, no italics, no bullet points, and no dashes for lists. Never use em dashes (—) or en dashes (–); use commas or separate sentences instead. Use plain sentences and emojis only. (seed: ${Math.random().toString(36).slice(2, 8)})`
     try {
       const r = await fetch("/api/openai", {
         method: "POST",
@@ -363,7 +370,7 @@ export default function Dashboard() {
       })
       const data = await r.json()
       return (
-        data.choices?.[0]?.message?.content ||
+        humanizeReply(data.choices?.[0]?.message?.content || "") ||
         getTaskCompletionMessage(character, {
           task_id: "0", name: taskText, category: category as TaskCategory,
           xp_value: 10, status: "completed", created_at: new Date().toISOString(),
@@ -501,7 +508,7 @@ export default function Dashboard() {
     fireConfettiAt(checkboxEl ?? null)
     playSound("pop")
     setFloatingXp({ id, xp: xpGained })
-    setTimeout(() => setFloatingXp((cur) => (cur?.id === id ? null : cur)), 800)
+    setTimeout(() => setFloatingXp((cur) => (cur?.id === id ? null : cur)), 3000)
     const assigned = todo.assignedCharacterId
       ? userCompanions.find((c) => c.id === todo.assignedCharacterId)
       : undefined
@@ -712,28 +719,38 @@ export default function Dashboard() {
           </Button>
         </nav>
 
-        <div className="mb-6">
+        <div className="mb-6 overflow-y-auto" style={{ maxHeight: "calc(100vh - 360px)" }}>
           <h3 className="text-xs uppercase tracking-wide text-gray-500 mb-2 px-2">My crew</h3>
-          <div className="space-y-1">
+          <div className="space-y-2">
             {userCompanions.map((character) => (
               <button
                 key={character.id}
                 onClick={() => openCharacterChat(character)}
-                className={`w-full flex items-center gap-2 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left ${
-                  activeCharacter?.id === character.id ? "bg-gray-800" : ""
+                className={`w-full text-left p-3 rounded-lg transition-colors ${
+                  activeCharacter?.id === character.id ? "bg-gray-800" : "bg-gray-800/40 hover:bg-gray-800"
                 }`}
               >
-                <Avatar className="w-9 h-9">
-                  <AvatarImage src={character.avatar} />
-                  <AvatarFallback>{character.name[0]}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1">
-                    <span className="text-sm font-medium">{character.name}</span>
-                    <Badge variant="outline" className="text-[10px] px-1 py-0">L{character.level}</Badge>
+                <div className="flex items-center gap-2 mb-2">
+                  <Avatar className="w-9 h-9">
+                    <AvatarImage src={character.avatar} />
+                    <AvatarFallback>{character.name[0]}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm font-medium">{character.name}</span>
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 text-purple-200 border-purple-500/50 bg-purple-500/10">L{character.level}</Badge>
+                    </div>
+                    <p className="text-[10px] text-gray-500 truncate">{character.personality}</p>
                   </div>
-                  <div className="text-[10px] text-gray-500">Bond {Math.floor(character.bondLevel)}/{character.maxBond}</div>
                 </div>
+                <div className="flex justify-between text-[10px] text-gray-400 mb-1">
+                  <span>Bond {Math.floor(character.bondLevel)}/{character.maxBond}</span>
+                  <span>{character.tasksCompleted} tasks</span>
+                </div>
+                <Progress value={(character.bondLevel / character.maxBond) * 100} className="h-1 bg-purple-950/50 [&>div]:bg-purple-500" />
+                {character.lastMessage && (
+                  <p className="text-[11px] text-gray-500 italic mt-2 truncate">"{truncate(character.lastMessage)}"</p>
+                )}
               </button>
             ))}
           </div>
@@ -761,8 +778,8 @@ export default function Dashboard() {
 
       <div className="lg:ml-64 transition-all duration-300">
         {currentView === "dashboard" ? (
-          <div className="p-4 sm:p-6 max-w-6xl mx-auto pt-14 lg:pt-6">
-            <div className="flex items-center justify-between mb-6 gap-3">
+          <div className="p-4 sm:p-6 max-w-6xl mx-auto pt-14 lg:pt-6 lg:h-screen lg:flex lg:flex-col lg:overflow-hidden">
+            <div className="flex items-center justify-between mb-4 gap-3">
               <div className="min-w-0">
                 <h1 className="text-xl sm:text-2xl font-bold truncate">Welcome back, {userInfo.username}</h1>
                 <p className="text-sm text-gray-400">Let's make today count.</p>
@@ -814,40 +831,46 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <StreakBanner
-              streakCount={streakCount}
-              completedToday={completedToday}
-              streakFreezes={streakFreezes}
-              plan={userInfo.plan}
-              onUseFreeze={useStreakFreezeNow}
-              hoursLeftInDay={Math.ceil(hoursLeft)}
-            />
+            <div className="flex-shrink-0">
+              <StreakBanner
+                streakCount={streakCount}
+                completedToday={completedToday}
+                streakFreezes={streakFreezes}
+                plan={userInfo.plan}
+                onUseFreeze={useStreakFreezeNow}
+                hoursLeftInDay={Math.ceil(hoursLeft)}
+              />
+            </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 flex-shrink-0">
               <Stat icon={<Zap className="w-5 h-5 text-purple-400" />} label="Total XP" value={totalXP.toString()} hint={xpMultiplier > 1 ? `${xpMultiplier.toFixed(1)}× streak bonus` : undefined} accent="purple" />
               <Stat icon={<Flame className="w-5 h-5 text-orange-400" />} label="Streak" value={`${streakCount}d`} hint={streakCount >= 3 ? "Bonus active" : streakCount === 0 ? "Start one today" : "Keep going"} accent="orange" />
               <Stat icon={<CheckCircle2 className="w-5 h-5 text-green-400" />} label="Tasks" value={`${completedTodos}/${todos.length}`} hint={completedToday > 0 ? `${completedToday} done today` : "Nothing done yet"} accent="green" />
               <Stat icon={<Timer className="w-5 h-5 text-blue-400" />} label="Focus" value={`${focusMinutesTotal}m`} hint="Lifetime focused" accent="blue" />
             </div>
 
-            <div className="grid lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-4">
+            <div className="grid lg:grid-cols-2 gap-6 items-stretch lg:flex-1 lg:min-h-0">
+              {/* Left: daily goal + quests */}
+              <div className="space-y-4 order-2 lg:order-1 lg:overflow-y-auto lg:min-h-0 pr-1">
                 <DailyGoalRing
                   xpToday={xpToday}
                   goal={dailyGoal}
                   level={userLevelForXp(totalXP)}
                 />
                 <DailyQuests quests={dailyQuests} companions={userCompanions} onComplete={completeDailyQuest} />
+              </div>
 
-                <Card className="bg-gray-900 border-gray-800 text-white">
-                  <CardHeader className="pb-3">
+              {/* Right: today's tasks */}
+              <div className="order-1 lg:order-2 lg:min-h-0 lg:h-full">
+                <Card className="bg-gray-900 border-gray-800 text-white flex flex-col lg:h-full">
+                  <CardHeader className="pb-3 flex-shrink-0">
                     <CardTitle className="flex items-center justify-between text-base text-white">
                       <span>Today's tasks</span>
                       <Badge variant="secondary" className="bg-gray-800 text-white">{completedTodos}/{todos.length}</Badge>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 mb-4">
+                  <CardContent className="flex-1 min-h-0 flex flex-col pt-1">
+                    <div className="space-y-2 mb-4 flex-shrink-0">
                       <div className="flex gap-2">
                         <Input
                           placeholder="Add a task..."
@@ -925,6 +948,7 @@ export default function Dashboard() {
                       </div>
                     </div>
 
+                    <div className="flex-1 min-h-0 overflow-y-auto -mr-2 pr-2">
                     {todos.length === 0 ? (
                       <div className="text-center py-8 text-sm text-gray-500">
                         No tasks yet — add one to get started.
@@ -994,43 +1018,7 @@ export default function Dashboard() {
                         ))}
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="space-y-4">
-                <Card className="bg-gray-900 border-gray-800 text-white">
-                  <CardHeader className="pb-2"><CardTitle className="text-base">Your crew</CardTitle></CardHeader>
-                  <CardContent className="space-y-3 pt-0">
-                    {userCompanions.map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => openCharacterChat(c)}
-                        className="w-full text-left p-3 bg-gray-800/40 hover:bg-gray-800 rounded-lg transition-colors"
-                      >
-                        <div className="flex items-center gap-3 mb-2">
-                          <Avatar className="w-10 h-10">
-                            <AvatarImage src={c.avatar} />
-                            <AvatarFallback>{c.name[0]}</AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1">
-                              <span className="text-sm font-medium">{c.name}</span>
-                              <Badge variant="outline" className="text-[10px] px-1 py-0">L{c.level}</Badge>
-                            </div>
-                            <p className="text-[11px] text-gray-500 truncate">{c.personality}</p>
-                          </div>
-                        </div>
-                        <div className="flex justify-between text-[10px] text-gray-400 mb-1">
-                          <span>Bond {Math.floor(c.bondLevel)}/{c.maxBond}</span>
-                          <span>{c.tasksCompleted} tasks</span>
-                        </div>
-                        <Progress value={(c.bondLevel / c.maxBond) * 100} className="h-1" />
-                        {c.lastMessage && (
-                          <p className="text-[11px] text-gray-500 italic mt-2 truncate">"{truncate(c.lastMessage)}"</p>
-                        )}
-                      </button>
-                    ))}
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -1062,6 +1050,8 @@ export default function Dashboard() {
             onSendFeedback={() => setSystemMessages((p) => [...p, "System: Thanks for the feedback!"])}
             soundEnabled={soundEnabled}
             onToggleSound={(enabled) => setSoundEnabled(enabled)}
+            persona={persona}
+            onUpdatePersona={(p) => setPersona(p)}
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
           />
@@ -1077,6 +1067,7 @@ export default function Dashboard() {
             userTasks={todos as any}
             userPlan={userInfo.plan}
             userInfo={userInfo}
+            personaHint={personaHint}
           />
         ) : null}
       </div>

@@ -54,6 +54,7 @@ interface ChatInterfaceProps {
   userTasks: Todo[]
   userPlan: "Free" | "Premium"
   userInfo?: { username: string; email: string; plan: "Free" | "Premium"; avatar: string }
+  personaHint?: string
 }
 
 export default function ChatInterface({
@@ -67,6 +68,7 @@ export default function ChatInterface({
   userTasks,
   userPlan,
   userInfo,
+  personaHint,
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>(chatHistory)
   const [newMessage, setNewMessage] = useState("")
@@ -107,7 +109,8 @@ export default function ChatInterface({
       const baseMessages = createCharacterPrompt(
         character.prompt,
         userInfo?.username || "User",
-        taskContext
+        taskContext,
+        personaHint
       )
 
       // Add conversation history
@@ -209,7 +212,7 @@ export default function ChatInterface({
               <Heart className="w-4 h-4 text-pink-400" />
               <span>Bond L{Math.floor(character.bondLevel)}</span>
             </div>
-            <Progress value={(character.bondLevel / character.maxBond) * 100} className="w-20 h-1 mt-1" />
+            <Progress value={(character.bondLevel / character.maxBond) * 100} className="w-20 h-1 mt-1 bg-purple-950/50 [&>div]:bg-purple-500" />
           </div>
           <Button variant="ghost" size="sm" className="text-white">
             <MoreVertical className="w-4 h-4" />
