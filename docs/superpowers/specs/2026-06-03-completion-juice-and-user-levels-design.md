@@ -96,8 +96,7 @@ Pure functions, written test-first.
 - `components/completion-burst.tsx` (or a small hook) — inline per-row juice: floating `+XP`, confetti at the checkbox coordinates, spring check.
 
 ### New infra
-- `hooks/use-sound.ts` + `/public/sounds/*` — native `Audio` playback, gated by the mute pref and `prefers-reduced-motion`.
-
+- `hooks/use-sound.ts` — Web Audio API tone synthesis (no asset files), gated by the mute pref (not by `prefers-reduced-motion`).
 ### Orchestration — `app/dashboard/page.tsx`
 - `handleTaskCompleted` remains the single XP choke point. Extended to:
   - track `xpToday` (increment by `xpGained`),
