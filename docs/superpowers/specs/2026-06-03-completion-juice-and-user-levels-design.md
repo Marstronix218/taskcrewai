@@ -141,5 +141,5 @@ The existing daily `useEffect` (recurring-task reset) also resets `xp_today` to 
 ## Dependencies
 - Runtime: `canvas-confetti` (~6 kb, zero-dep).
 - Dev: `vitest`.
-- Sound assets in `/public/sounds`.
+- Sound: synthesized via the Web Audio API (no asset files).
 - Install reminder: `npm install --legacy-peer-deps` per CLAUDE.md.
